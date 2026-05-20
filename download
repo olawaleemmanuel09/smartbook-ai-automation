@@ -1,0 +1,51 @@
+# ============================================================
+# Secrets — NEVER commit these
+# ============================================================
+.env
+.env.local
+.env.*.local
+*.env
+credentials.json
+secrets.json
+service-account*.json
+*-credentials.json
+*.pem
+*.key
+*.p12
+
+# n8n local data
+.n8n/
+n8n-data/
+n8n_data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Build / runtime
+node_modules/
+dist/
+build/
+*.log
+logs/
+
+# Backups
+*.bak
+*.backup
+*~

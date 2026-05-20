@@ -1,0 +1,1053 @@
+{
+  "name": "Smart Book AI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "smartbook/booking",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2bc3f30e-9158-41c1-932f-6565ef29fd39",
+      "name": "\ud83d\udce5 New Booking Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1424,
+        32
+      ],
+      "webhookId": "{{REGENERATE_ON_IMPORT}}"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-required-fields",
+              "leftValue": "={{ $json.body.client_name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "check-service",
+              "leftValue": "={{ $json.body.service }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "check-datetime",
+              "leftValue": "={{ $json.body.appointment_datetime }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7f88b305-c8ae-4e24-9232-a9822d517d3d",
+      "name": "\u2705 Validate Booking Data",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: 'Missing required fields: client_name, service, or appointment_datetime', code: 400 }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "72dfed98-bc0e-4dda-91ea-e398bab1c53d",
+      "name": "\u274c Validation Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://{{SUPABASE_PROJECT_ID}}.supabase.co/rest/v1/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0dnZkbm9uZmthYmhpd2p3eHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MTk1MjcsImV4cCI6MjA4OTM5NTUyN30.hGexSax--CzA7bL0VP3TxJOdJcmHVhTA0wGQn0hS2KA"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ client_name: $json.body.client_name, client_email: $json.body.client_email, client_phone: $json.body.client_phone, provider_id: $json.body.provider_id, service: $json.body.service, appointment_datetime: $json.body.appointment_datetime, notes: $json.body.notes || '', status: 'confirmed', created_at: new Date().toISOString(), booking_id: 'BK-' + Date.now() }) }}",
+        "options": {}
+      },
+      "id": "2c7ea0b8-1d34-48af-b34a-3d9fbf7a7e54",
+      "name": "\ud83d\udcbe Save Booking to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -960,
+        32
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_HTTPHEADERAUTH_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "high-risk-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "confirmed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "71612f4d-1dc2-49d7-ba5d-c82f9698d020",
+      "name": "\u26a0\ufe0f High Risk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{NOTIFICATION_EMAIL}}",
+        "toEmail": "={{ $json.client_email }}",
+        "subject": "={{ $json.service }}",
+        "text": "=Dear {{ $json.client_name }},\n\nYour booking has been confirmed successfully!\n\nHere are your details:\n\nBooking ID: {{ $json.booking_id }}\nService: {{ $json.service }}\nDate & Time: {{ $json.appointment_datetime }}\n\nWe look forward to seeing you! You will receive a reminder 24 hours and 2 hours before your appointment.\n\nNeed to reschedule? Simply reply to this email or call us.\n\nBest regards,\nSmartBook Team",
+        "options": {}
+      },
+      "id": "779ae639-a75e-4a26-a5bf-eaeecc764af9",
+      "name": "\ud83d\udce7 Send Confirmation Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        32
+      ],
+      "webhookId": "{{REGENERATE_ON_IMPORT}}",
+      "credentials": {
+        "smtp": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_SMTP_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"success\": true, \"message\": \"Booking confirmed\", \"status\": \"confirmed\"}",
+        "options": {
+          "responseCode": 201
+        }
+      },
+      "id": "c72f932b-8196-4d61-aebf-03ca1bfc3a88",
+      "name": "\u2705 Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "33d27259-06a3-4adb-85b7-a5993e3611e2",
+      "name": "\u23f0 Reminder Scheduler (Hourly)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://{{SUPABASE_PROJECT_ID}}.supabase.co/rest/v1/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "eq.confirmed"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0dnZkbm9uZmthYmhpd2p3eHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MTk1MjcsImV4cCI6MjA4OTM5NTUyN30.hGexSax--CzA7bL0VP3TxJOdJcmHVhTA0wGQn0hS2KA"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "141ed6f0-2971-416c-89a6-b1b713e1cd17",
+      "name": "\ud83d\udccb Fetch Upcoming Bookings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        368,
+        32
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_HTTPHEADERAUTH_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "24h-window",
+              "leftValue": "={{ Math.abs(new Date($json.appointment_datetime) - new Date()) / 36e5 }}",
+              "rightValue": 24,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            },
+            {
+              "id": "not-too-soon",
+              "leftValue": "={{ Math.abs(new Date($json.appointment_datetime) - new Date()) / 36e5 }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "not-reminded-24h",
+              "leftValue": "={{ $json.reminded_24h }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5c7f8222-af6a-49f5-aaa7-83fff1ea1ef1",
+      "name": "\ud83d\udd50 Is 24h Reminder Due?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        848,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{SMTP_FROM_EMAIL}}",
+        "toEmail": "={{ $json.client_email }}",
+        "subject": "=\u23f0 Reminder: Your {{ $json.service }} appointment is tomorrow - SmartBook",
+        "text": "=Dear {{ $json.client_name }},\n\nThis is a reminder that your appointment is coming up tomorrow!\n\nHere are your details:\n\nBooking ID: {{ $json.booking_id }}\nService: {{ $json.service }}\nDate & Time: {{ $json.appointment_datetime }}\n\nPlease make sure to arrive on time. If you need to reschedule, contact us as soon as possible.\n\nBest regards,\nSmartBook Team",
+        "options": {}
+      },
+      "id": "2c01fd6c-2f39-4c56-93df-8fc96b6174de",
+      "name": "\ud83d\udce7 24h Email Reminder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        -64
+      ],
+      "webhookId": "{{REGENERATE_ON_IMPORT}}",
+      "credentials": {
+        "smtp": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_SMTP_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "{{TWILIO_PHONE_NUMBER}}",
+        "to": "={{ $json.client_phone }}",
+        "message": "=Hi {{ $json.client_name }}! Reminder: Your {{ $json.service }} appointment is tomorrow at {{ $json.appointment_datetime }}. Reply CONFIRM to confirm or CANCEL to cancel. Booking ID: {{ $json.booking_id }} - SmartBook",
+        "options": {}
+      },
+      "id": "9d7196dc-5c71-4264-9c0b-616d66a9dc89",
+      "name": "\ud83d\udcf1 24h SMS Reminder",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        96
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_TWILIOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://{{SUPABASE_PROJECT_ID}}.supabase.co/rest/v1/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "booking_id",
+              "value": "=eq.{{ $('\ud83d\udccb Fetch Upcoming Bookings').item.json.booking_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0dnZkbm9uZmthYmhpd2p3eHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MTk1MjcsImV4cCI6MjA4OTM5NTUyN30.hGexSax--CzA7bL0VP3TxJOdJcmHVhTA0wGQn0hS2KA"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"reminded_24h\": true }",
+        "options": {}
+      },
+      "id": "34062ae9-ce14-4a26-a35b-27d605453726",
+      "name": "\u2705 Mark 24h Reminded",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        32
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_HTTPHEADERAUTH_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "2h-window",
+              "leftValue": "={{ Math.abs(new Date($json.appointment_datetime) - new Date()) / 36e5 }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            },
+            {
+              "id": "not-too-late",
+              "leftValue": "={{ Math.abs(new Date($json.appointment_datetime) - new Date()) / 36e5 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "not-reminded-2h",
+              "leftValue": "={{ $json.reminded_2h }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b6c00be5-a38d-4b36-a544-add57defd4f0",
+      "name": "\ud83d\udd51 Is 2h Reminder Due?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        848,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "from": "{{TWILIO_PHONE_NUMBER}}",
+        "to": "={{ $json.client_phone }}",
+        "message": "=Hi {{ $json.client_name }}! Reminder: Your {{ $json.service }} appointment is tomorrow at {{ $json.appointment_datetime }}. Reply CONFIRM to confirm or CANCEL to cancel. Booking ID: {{ $json.booking_id }} - SmartBook",
+        "options": {}
+      },
+      "id": "06f6304c-4e2b-4fcd-8d65-6bc4e5465098",
+      "name": "\ud83d\udcf1 2h SMS Reminder",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        256
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_TWILIOAPI_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://{{SUPABASE_PROJECT_ID}}.supabase.co/rest/v1/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "booking_id",
+              "value": "=eq.{{ $('\ud83d\udccb Fetch Upcoming Bookings').item.json.booking_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0dnZkbm9uZmthYmhpd2p3eHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MTk1MjcsImV4cCI6MjA4OTM5NTUyN30.hGexSax--CzA7bL0VP3TxJOdJcmHVhTA0wGQn0hS2KA"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"reminded_2h\": true }",
+        "options": {}
+      },
+      "id": "8cb432f1-b38c-4f18-8e20-4cac2bac902f",
+      "name": "\u2705 Mark 2h Reminded",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        256
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_HTTPHEADERAUTH_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "smartbook/cancel",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1df583f0-659a-4d63-9b81-68e4e67f3fef",
+      "name": "\ud83d\udeab Cancel Booking Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1344,
+        416
+      ],
+      "webhookId": "{{REGENERATE_ON_IMPORT}}"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://{{SUPABASE_PROJECT_ID}}.supabase.co/rest/v1/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "booking_id",
+              "value": "=eq.{{ $('\ud83d\udeab Cancel Booking Webhook').item.json.body.booking_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0dnZkbm9uZmthYmhpd2p3eHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MTk1MjcsImV4cCI6MjA4OTM5NTUyN30.hGexSax--CzA7bL0VP3TxJOdJcmHVhTA0wGQn0hS2KA"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"cancelled\", \"cancelled_at\": \"{{ new Date().toISOString() }}\", \"cancellation_reason\": \"{{ $json.body.reason || 'Client requested cancellation' }}\" }",
+        "options": {}
+      },
+      "id": "29c44b9d-112f-444b-943d-6d1e99caa63c",
+      "name": "\ud83d\uddc4\ufe0f Update Booking Status to Cancelled",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1104,
+        416
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_HTTPHEADERAUTH_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{NOTIFICATION_EMAIL}}",
+        "toEmail": "={{ $('\ud83d\udeab Cancel Booking Webhook').item.json.body.client_email }}",
+        "subject": "=Booking Cancelled - {{ $json.booking_id }} | SmartBook",
+        "text": "=Dear {{ $json.client_name }},\n\nYour booking has been successfully cancelled.\n\nCancelled Booking Details:\n\nBooking ID: {{ $json.booking_id }}\nService: {{ $json.service }}\nOriginal Date & Time: {{ $json.appointment_datetime }}\n\nIf this was a mistake or you would like to rebook, please don't hesitate to reach out to us.\n\nWe hope to see you soon!\n\nBest regards,\nSmartBook Team",
+        "options": {}
+      },
+      "id": "4bff6a52-71fe-44d1-8145-1338e4fd1152",
+      "name": "\ud83d\udce7 Send Cancellation Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        416
+      ],
+      "webhookId": "{{REGENERATE_ON_IMPORT}}",
+      "credentials": {
+        "smtp": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_SMTP_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"success\": true, \"message\": \"Booking cancelled successfully\"}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c197e1d6-5841-4ae3-80db-0582acc2b7ea",
+      "name": "\u2705 Cancel Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 * * *"
+            }
+          ]
+        }
+      },
+      "id": "d113eef8-98af-4a2c-a722-447f10f6b2a2",
+      "name": "\u2b50 Feedback Scheduler (8PM Daily)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -288,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://{{SUPABASE_PROJECT_ID}}.supabase.co/rest/v1/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "eq.confirmed"
+            },
+            {
+              "name": "feedback_sent",
+              "value": "eq.false"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0dnZkbm9uZmthYmhpd2p3eHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MTk1MjcsImV4cCI6MjA4OTM5NTUyN30.hGexSax--CzA7bL0VP3TxJOdJcmHVhTA0wGQn0hS2KA"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "31d82dc5-0ef8-44f7-9904-b0c988b808ac",
+      "name": "\ud83d\udccb Fetch Today's Completed Bookings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -48,
+        432
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_HTTPHEADERAUTH_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{NOTIFICATION_EMAIL}}",
+        "toEmail": "={{ $json.client_email }}",
+        "subject": "=\u2b50 How was your experience? | SmartBook",
+        "text": "=Dear {{ $json.client_name }},\n\nWe hope your {{ $json.service }} session went great!\n\nWe would love to hear your feedback. Please rate your experience:\n\n\u2b50\u2b50\u2b50\u2b50\u2b50 Excellent\n\u2b50\u2b50\u2b50\u2b50 Good\n\u2b50\u2b50\u2b50 Average\n\nSimply reply to this email with your rating.\n\nThank you for choosing SmartBook!\n\nBest regards,\nSmartBook Team",
+        "options": {}
+      },
+      "id": "7665b825-6ec0-4459-b7d1-d1d6a05ee959",
+      "name": "\u2b50 Send Feedback Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        256,
+        432
+      ],
+      "webhookId": "{{REGENERATE_ON_IMPORT}}",
+      "credentials": {
+        "smtp": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_SMTP_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://{{SUPABASE_PROJECT_ID}}.supabase.co/rest/v1/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "booking_id",
+              "value": "=eq.{{ $('\ud83d\udccb Fetch Today\\'s Completed Bookings').item.json.booking_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0dnZkbm9uZmthYmhpd2p3eHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MTk1MjcsImV4cCI6MjA4OTM5NTUyN30.hGexSax--CzA7bL0VP3TxJOdJcmHVhTA0wGQn0hS2KA"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"feedback_sent\": true, \"status\": \"completed\" }",
+        "options": {}
+      },
+      "id": "76af75b4-96b8-4cf4-98b4-ca52ecd5c82f",
+      "name": "\u2705 Mark Feedback Sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        432
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "{{YOUR_CREDENTIAL_ID}}",
+          "name": "YOUR_HTTPHEADERAUTH_CREDENTIAL"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "\ud83d\udce5 New Booking Webhook": {
+      "main": [
+        [
+          {
+            "node": "\u2705 Validate Booking Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\u2705 Validate Booking Data": {
+      "main": [
+        [
+          {
+            "node": "\ud83d\udcbe Save Booking to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "\u274c Validation Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udcbe Save Booking to Supabase": {
+      "main": [
+        [
+          {
+            "node": "\u26a0\ufe0f High Risk?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\u26a0\ufe0f High Risk?": {
+      "main": [
+        [
+          {
+            "node": "\ud83d\udce7 Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "\ud83d\udce7 Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udce7 Send Confirmation Email": {
+      "main": [
+        [
+          {
+            "node": "\u2705 Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\u23f0 Reminder Scheduler (Hourly)": {
+      "main": [
+        [
+          {
+            "node": "\ud83d\udccb Fetch Upcoming Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udccb Fetch Upcoming Bookings": {
+      "main": [
+        [
+          {
+            "node": "\ud83d\udd50 Is 24h Reminder Due?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "\ud83d\udd51 Is 2h Reminder Due?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udd50 Is 24h Reminder Due?": {
+      "main": [
+        [
+          {
+            "node": "\ud83d\udce7 24h Email Reminder",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "\ud83d\udcf1 24h SMS Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udce7 24h Email Reminder": {
+      "main": [
+        [
+          {
+            "node": "\u2705 Mark 24h Reminded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udcf1 24h SMS Reminder": {
+      "main": [
+        [
+          {
+            "node": "\u2705 Mark 24h Reminded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udd51 Is 2h Reminder Due?": {
+      "main": [
+        [
+          {
+            "node": "\ud83d\udcf1 2h SMS Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udcf1 2h SMS Reminder": {
+      "main": [
+        [
+          {
+            "node": "\u2705 Mark 2h Reminded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udeab Cancel Booking Webhook": {
+      "main": [
+        [
+          {
+            "node": "\ud83d\uddc4\ufe0f Update Booking Status to Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\uddc4\ufe0f Update Booking Status to Cancelled": {
+      "main": [
+        [
+          {
+            "node": "\ud83d\udce7 Send Cancellation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udce7 Send Cancellation Email": {
+      "main": [
+        [
+          {
+            "node": "\u2705 Cancel Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\u2b50 Feedback Scheduler (8PM Daily)": {
+      "main": [
+        [
+          {
+            "node": "\ud83d\udccb Fetch Today's Completed Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\ud83d\udccb Fetch Today's Completed Bookings": {
+      "main": [
+        [
+          {
+            "node": "\u2b50 Send Feedback Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "\u2b50 Send Feedback Email": {
+      "main": [
+        [
+          {
+            "node": "\u2705 Mark Feedback Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "{{generated_on_import}}",
+  "id": "{{generated_on_import}}",
+  "tags": []
+}
